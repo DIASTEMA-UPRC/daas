@@ -128,6 +128,7 @@ def data_loading_callback(ch, method, properties, body):
         result = json.dumps({
                     "job-id": job_id,
                     "loaded": exports,
+                    "features": metadata.features,
                     "metadata": metadata.to_dict()
                 })
         mongo.update_one({"_id": match["_id"]}, {
