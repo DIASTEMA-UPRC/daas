@@ -67,7 +67,7 @@ class Metadata:
                 fc["positive"] = all_pos
                 fc["negative"] = all_neg
                 fc["non-zero"] = non_zero
-                fc["zero"] = all_zero
+                fc["all-zero"] = all_zero
 
             features.append(fc)
 
