@@ -82,7 +82,7 @@ def data_loading_callback(ch, method, properties, body):
     print(f"Data loading job received")
     
     data = json.loads(body.decode())
-    mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]["DataLoading"]
+    mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]["DataIngesting"]
     minio = MinIO(MINIO_HOST, MINIO_PORT, MINIO_USER, MINIO_PASS)
 
     input_bucket, input_path, output_bucket, output_path, job_id = parse_data_dict(data)
@@ -118,15 +118,17 @@ def data_loading_callback(ch, method, properties, body):
         exports.append(f"{output_bucket}/{df_name}")
 
         metadata.samples += df.shape[0]
-        metadata.features = df.columns
+        # metadata.features = df.columns.tolist()
+        metadata.to_new_features(df)
         metadata.size += df.memory_usage(deep=True).sum()
 
-    match = mongo.find_one({"job-id": job_id})
+    match = mongo.find_one({"job-id": str(job_id)})
 
     if match:
         result = json.dumps({
                     "job-id": job_id,
                     "loaded": exports,
+                    "features": metadata.features,
                     "metadata": metadata.to_dict()
                 })
         mongo.update_one({"_id": match["_id"]}, {

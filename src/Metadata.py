@@ -18,7 +18,7 @@ class Metadata:
 
     def to_dict(self) -> dict():
         return {
-            "features": [str(x) for x in self.features],
+            "features": self.features,
                 "name": str(self.name),
               "source": str(self.source),
             "location": str(self.location),
@@ -29,6 +29,49 @@ class Metadata:
           "updated_at": str(self.updated_at)
         }
 
+
+    def to_new_features(self, df: pd.DataFrame):
+        features = list()
+
+        for i, x in enumerate(df.dtypes):
+            column_name = str(df.columns[i])
+            column_type = "str"
+            
+            
+            if x == "int64":
+                column_type = "int"
+            elif x == "float64":
+                column_type = "float"
+            
+            fc = dict()
+            fc["name"] = column_name
+            fc["type"] = column_type
+            
+            if column_type != "str":
+                all_pos = True
+                all_neg = True
+                all_zero = True
+                non_zero = False
+                
+                for x in df[column_name]:
+                    if x > 0:
+                        all_neg = False
+                    if x < 0:
+                        all_pos = False
+                    if x != 0:
+                        all_zero = False
+                    if x == 0:
+                        non_zero = True
+                
+                
+                fc["positive"] = all_pos
+                fc["negative"] = all_neg
+                fc["non-zero"] = non_zero
+                fc["all-zero"] = all_zero
+
+            features.append(fc)
+
+        self.features = features
 
     def from_dict(self, data: dict):
         self.features   = data["features"]
