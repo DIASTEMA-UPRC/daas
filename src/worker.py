@@ -40,22 +40,36 @@ def data_ingesting_callback(ch, method, properties, body):
     mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]["DataIngesting"]
     minio = MinIO(MINIO_HOST, MINIO_PORT, MINIO_USER, MINIO_PASS)
 
+
     print(data)
 
     url = data.get("url")
     token = data.get("token")
+    separator = data.get("separator")
+    first_line_labels = data.get("first-line-labels")
+    labels = data.get("labels")
     minio_output = data.get("minio-output")
     job_id = str(data.get("job-id"))
     md = Metadata("Dataset", "N/A", minio_output, "N/A", 0, 0, 0)
 
     print(f"Data ingesting job {job_id} started")
 
+    match = mongo.find_one({"job-id": job_id})
+
     try:
-        f_name, md = download(url, token)
-        upload(f_name, minio, minio_output)
+        df, md, name = download(url, token, separator, first_line_labels, labels)
+        upload(df, name, minio, minio_output)
     except Exception as ex:
         print(f"{job_id} data ingesting error")
         print(ex)
+        
+        mongo.update_one({"_id": match["_id"]}, {
+            "$set": {
+                "status": "error",
+                "message": str(ex)
+            },
+        })
+        
         return
 
     result = json.dumps({
@@ -63,8 +77,6 @@ def data_ingesting_callback(ch, method, properties, body):
         "ingested": minio_output,
         "features": md.features
     })
-
-    match = mongo.find_one({"job-id": job_id})
 
     mongo.update_one({"_id": match["_id"]}, {
         "$set": {
@@ -139,6 +151,12 @@ def data_loading_callback(ch, method, properties, body):
         })
     else:
         print(f"{job_id} data loading error")
+        mongo.update_one({"_id": match["_id"]}, {
+            "$set": {
+                "status": "error",
+                "message": "error data loading"
+            },
+        })
         return
 
     ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -202,6 +220,12 @@ def data_cleaning_callback(ch, method, properties, body):
 
     else:
         print(f"{job_id} data cleaning error")
+        mongo.update_one({"_id": match["_id"]}, {
+            "$set": {
+                "status": "error",
+                "message": "error data cleaning"
+            },
+        })
         return
 
     ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -231,6 +255,14 @@ def join_callback(ch, method, properties, body):
     except Exception as ex:
         print(f"{job_id} join error")
         print(ex)
+
+        mongo.update_one({"_id": match["_id"]}, {
+            "$set": {
+                "status": "error",
+                "message": str(ex)
+            },
+        })
+        
         return
 
     result = json.dumps({
