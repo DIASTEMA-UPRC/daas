@@ -40,7 +40,7 @@ def data_ingesting_callback(ch, method, properties, body):
     mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]["DataIngesting"]
     minio = MinIO(MINIO_HOST, MINIO_PORT, MINIO_USER, MINIO_PASS)
 
-    ingestion_json = data.get("ingenstion_json")
+    ingestion_json = data.get("ingestion_json")
     url = ingestion_json.get("url")
     token = ingestion_json.get("token")
     separator = ingestion_json.get("separator")
