@@ -33,14 +33,3 @@ services:
       - RABBITMQ_HOST=daas-rabbitmq
       - MONGO_HOST=daas-mongo
     restart: always
-  app:
-    container_name: daas
-    build:
-      context: .
-    image: daas:latest
-    depends_on:
-      - rabbitmq
-      - mongo
-      - minio
-      - api
-    restart: always

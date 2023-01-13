@@ -1,8 +1,5 @@
 # Base image
-FROM python:3.8
-
-# Expose ports
-EXPOSE 5000
+FROM python:3.10
 
 # Update system
 RUN apt update -y
