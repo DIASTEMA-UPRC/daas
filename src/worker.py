@@ -13,6 +13,7 @@ from ingest import download, upload
 from load import load_data_as_dataframe
 from clean import drop_null, clean_string, clean_number
 from join import join
+from visualization import visualization
 
 
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "0.0.0.0")
@@ -30,6 +31,7 @@ channel.queue_declare(queue="data-ingesting", durable=True)
 channel.queue_declare(queue="data-loading", durable=True)
 channel.queue_declare(queue="data-cleaning", durable=True)
 channel.queue_declare(queue="join", durable=True)
+channel.queue_declare(queue="visualization", durable=True)
 
 print("connected...")
 
@@ -40,14 +42,12 @@ def data_ingesting_callback(ch, method, properties, body):
     mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]["DataIngesting"]
     minio = MinIO(MINIO_HOST, MINIO_PORT, MINIO_USER, MINIO_PASS)
 
-
-    print(data)
-
-    url = data.get("url")
-    token = data.get("token")
-    separator = data.get("separator")
-    first_line_labels = data.get("first-line-labels")
-    labels = data.get("labels")
+    ingestion_json = data.get("ingestion_json")
+    url = ingestion_json.get("url")
+    token = ingestion_json.get("token")
+    separator = ingestion_json.get("separator")
+    first_line_labels = ingestion_json.get("first-line-labels")
+    labels = ingestion_json.get("labels")
     minio_output = data.get("minio-output")
     job_id = str(data.get("job-id"))
     md = Metadata("Dataset", "N/A", minio_output, "N/A", 0, 0, 0)
@@ -250,6 +250,8 @@ def join_callback(ch, method, properties, body):
 
     print(f"Join job {job_id} started")
 
+    match = mongo.find_one({"job-id": job_id})
+    
     try:
         join(minio, inputs, column, join_type, output)
     except Exception as ex:
@@ -270,7 +272,6 @@ def join_callback(ch, method, properties, body):
         "output": output,
     })
 
-    match = mongo.find_one({"job-id": job_id})
 
     mongo.update_one({"_id": match["_id"]}, {
         "$set": {
@@ -284,9 +285,54 @@ def join_callback(ch, method, properties, body):
     print(f"Join job {job_id} completed")
 
 
+def visualization_callback(ch, method, properties, body):
+    print("Join job received")
+
+    data = json.loads(body.decode())
+    mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]["Visualization"]
+    minio = MinIO(MINIO_HOST, MINIO_PORT, MINIO_USER, MINIO_PASS)
+
+    print(data)
+
+    minio_input = data.get("minio-input")
+    minio_output = data.get("minio-output")
+    job_id = str(data.get("job-id"))
+
+    print(minio_input, minio_output)
+    print(f"Visualization job {job_id} started")
+    
+    match = mongo.find_one({"job-id": job_id})
+
+    try:
+        visualization(minio, minio_input, minio_output)
+    except Exception as ex:
+        print(f"{job_id} visualization error")
+        print(ex)
+
+        mongo.update_one({"_id": match["_id"]}, {
+            "$set": {
+                "status": "error",
+                "message": str(ex)
+            },
+        })
+        
+        return
+
+    mongo.update_one({"_id": match["_id"]}, {
+        "$set": {
+            "status": "complete",
+        }
+    })
+
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    print(f"Join job {job_id} completed")
+
+
 channel.basic_qos(prefetch_count=1)
 channel.basic_consume(queue="data-ingesting", on_message_callback=data_ingesting_callback)
 channel.basic_consume(queue="data-loading", on_message_callback=data_loading_callback)
 channel.basic_consume(queue="data-cleaning", on_message_callback=data_cleaning_callback)
 channel.basic_consume(queue="join", on_message_callback=join_callback)
+channel.basic_consume(queue="visualization", on_message_callback=visualization_callback)
 channel.start_consuming()
