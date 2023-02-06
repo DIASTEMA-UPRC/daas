@@ -289,7 +289,7 @@ def visualization_callback(ch, method, properties, body):
     print("Join job received")
 
     data = json.loads(body.decode())
-    mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]["Visualization"]
+    mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]
     minio = MinIO(MINIO_HOST, MINIO_PORT, MINIO_USER, MINIO_PASS)
 
     print(data)
@@ -301,10 +301,11 @@ def visualization_callback(ch, method, properties, body):
     print(minio_input, minio_output)
     print(f"Visualization job {job_id} started")
     
-    match = mongo.find_one({"job-id": job_id})
+    match = mongo["Visualization"].find_one({"job-id": job_id})
+    analytics = mongo["Analytics"].find_one({"job-id": job_id})
 
     try:
-        visualization(minio, minio_input, minio_output)
+        visualization(minio, minio_input, minio_output, analytics)
     except Exception as ex:
         print(f"{job_id} visualization error")
         print(ex)
@@ -318,7 +319,7 @@ def visualization_callback(ch, method, properties, body):
         
         return
 
-    mongo.update_one({"_id": match["_id"]}, {
+    mongo["Visualization"].update_one({"_id": match["_id"]}, {
         "$set": {
             "status": "complete",
         }
@@ -326,7 +327,7 @@ def visualization_callback(ch, method, properties, body):
 
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    print(f"Join job {job_id} completed")
+    print(f"Visualization job {job_id} completed")
 
 
 channel.basic_qos(prefetch_count=1)

@@ -5,12 +5,39 @@ from autoviz.AutoViz_Class import AutoViz_Class
 from io import BytesIO
 from uuid import uuid4
 
+from jinja2 import Environment, BaseLoader
+
+from pymongo.typings import _DocumentType
+from typing import Optional
+
 from MinIO import MinIO
 
 av = AutoViz_Class()
 
+BASE_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metrics</title>
+</head>
+<body>
+    {% for metric in metrics %}
+        {% if metric.value != 0 %}
+            <section>
+                <h1>{{ metric.name }}</h1>
+                <p>{{ metric.value }}</p>
+            </section>
+        {% endif %}
+    {% endfor %}
+</body>
+</html>
+"""
 
-def visualization(minio: MinIO, minio_input: str, minio_output: str):
+
+def visualization(minio: MinIO, minio_input: str, minio_output: str, analytics: Optional[_DocumentType]):
     bucket, filename = minio_input.split("/", 1)
 
     print(bucket, filename)
@@ -53,3 +80,31 @@ def visualization(minio: MinIO, minio_input: str, minio_output: str):
             bucket, filename = minio_output.split("/", 1)
             minio.put_object(bucket, f"{filename}/visualization_{f}", plot,
                              plot_size)
+
+    if analytics is None:
+        return
+
+    metrics = list()
+    f1 = analytics.get("f1", 0)
+    metrics.append({ "name": "f1", "value": f1 })
+    accuracy = analytics.get("accuracy", 0)
+    metrics.append({ "name": "accuracy", "value": accuracy })
+    r2 = analytics.get("r2", 0)
+    metrics.append({ "name": "r2", "value": r2 })
+    rmse = analytics.get("rmse", 0)
+    metrics.append({ "name": "rmse", "value": rmse })
+
+    env = Environment(loader=BaseLoader)
+    template = env.from_string(BASE_HTML).render(metrics=metrics)
+
+    with open(os.path.join(plot_dir, "metrics.html"), "w") as metrics_file:
+        metrics_file.write(template)
+
+    with open(os.path.join(plot_dir, "metrics.html"), "r") as metrics_file:
+        metrics = metrics_file.read().encode("utf-8")
+        metrics_size = len(metrics)
+        metrics = BytesIO(metrics)
+        metrics.seek(0)
+        bucket, filename = minio_output.split("/", 1)
+        minio.put_object(bucket, f"{filename}/metrics.html", metrics,
+                         metrics_size)
