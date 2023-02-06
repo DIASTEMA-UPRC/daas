@@ -25,10 +25,12 @@ BASE_HTML = """
 </head>
 <body>
     {% for metric in metrics %}
-        <section>
-            <h1>{{ metric.name }}</h1>
-            <p>{{ metric.value }}</p>
-        </section>
+        {% if metric.value != 0 %}
+            <section>
+                <h1>{{ metric.name }}</h1>
+                <p>{{ metric.value }}</p>
+            </section>
+        {% endif %}
     {% endfor %}
 </body>
 </html>
@@ -97,7 +99,7 @@ def visualization(minio: MinIO, minio_input: str, minio_output: str, analytics: 
 
     with open(os.path.join(plot_dir, "metrics.html"), "w") as metrics_file:
         metrics_file.write(template)
-        
+
     with open(os.path.join(plot_dir, "metrics.html"), "r") as metrics_file:
         metrics = metrics_file.read().encode("utf-8")
         metrics_size = len(metrics)
@@ -106,4 +108,3 @@ def visualization(minio: MinIO, minio_input: str, minio_output: str, analytics: 
         bucket, filename = minio_output.split("/", 1)
         minio.put_object(bucket, f"{filename}/metrics.html", metrics,
                          metrics_size)
-

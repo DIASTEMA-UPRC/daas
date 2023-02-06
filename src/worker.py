@@ -319,7 +319,7 @@ def visualization_callback(ch, method, properties, body):
         
         return
 
-    mongo.update_one({"_id": match["_id"]}, {
+    mongo["Visualization"].update_one({"_id": match["_id"]}, {
         "$set": {
             "status": "complete",
         }
@@ -327,7 +327,7 @@ def visualization_callback(ch, method, properties, body):
 
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    print(f"Join job {job_id} completed")
+    print(f"Visualization job {job_id} completed")
 
 
 channel.basic_qos(prefetch_count=1)
