@@ -286,7 +286,7 @@ def join_callback(ch, method, properties, body):
 
 
 def visualization_callback(ch, method, properties, body):
-    print("Join job received")
+    print("Visualization job received")
 
     data = json.loads(body.decode())
     mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]
@@ -310,7 +310,7 @@ def visualization_callback(ch, method, properties, body):
         print(f"{job_id} visualization error")
         print(ex)
 
-        mongo.update_one({"_id": match["_id"]}, {
+        mongo["Visualization"].update_one({"_id": match["_id"]}, {
             "$set": {
                 "status": "error",
                 "message": str(ex)
