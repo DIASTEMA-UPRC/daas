@@ -286,7 +286,7 @@ def join_callback(ch, method, properties, body):
 
 
 def visualization_callback(ch, method, properties, body):
-    print("Join job received")
+    print("Visualization job received")
 
     data = json.loads(body.decode())
     mongo = Mongo(MONGO_HOST, MONGO_PORT)["Diastema"]
@@ -294,23 +294,33 @@ def visualization_callback(ch, method, properties, body):
 
     print(data)
 
-    minio_input = data.get("minio-input")
-    minio_output = data.get("minio-output")
+    input_bucket, input_path, output_bucket, output_path, job_id = parse_data_dict(data)
     job_id = str(data.get("job-id"))
 
-    print(minio_input, minio_output)
     print(f"Visualization job {job_id} started")
+    print("Visualization input", input_bucket, input_path)
+    print("Visualization output", output_bucket, output_path)
     
     match = mongo["Visualization"].find_one({"job-id": job_id})
     analytics = mongo["Analytics"].find_one({"job-id": job_id})
 
+    files = minio.list_objects(input_bucket, recursive=True)
+
+    print(files)
+
     try:
-        visualization(minio, minio_input, minio_output, analytics)
+        for f in files:
+            file_path, file_directory, _ = parse_file(f.object_name)
+            
+            if file_directory != input_path:
+                continue
+            
+            visualization(minio, input_bucket, file_path, output_bucket, output_path, analytics)
     except Exception as ex:
         print(f"{job_id} visualization error")
         print(ex)
 
-        mongo.update_one({"_id": match["_id"]}, {
+        mongo["Visualization"].update_one({"_id": match["_id"]}, {
             "$set": {
                 "status": "error",
                 "message": str(ex)

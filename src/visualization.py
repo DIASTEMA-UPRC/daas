@@ -37,12 +37,9 @@ BASE_HTML = """
 """
 
 
-def visualization(minio: MinIO, minio_input: str, minio_output: str, analytics: Optional[_DocumentType]):
-    bucket, filename = minio_input.split("/", 1)
-
-    print(bucket, filename)
-
-    response = minio.get_object(bucket, filename)
+def visualization(minio: MinIO, input_bucket: str, input_path: str, output_bucket: str, output_path: str, analytics: Optional[_DocumentType]):
+    save_id = input_path.replace("/", "_")
+    response = minio.get_object(input_bucket, input_path)
     buffer = BytesIO(response.read())
     buffer.seek(0)
     df = pd.read_csv(buffer)
@@ -77,8 +74,7 @@ def visualization(minio: MinIO, minio_input: str, minio_output: str, analytics: 
             plot_size = len(plot)
             plot = BytesIO(plot)
             plot.seek(0)
-            bucket, filename = minio_output.split("/", 1)
-            minio.put_object(bucket, f"{filename}/visualization_{f}", plot,
+            minio.put_object(output_bucket, f"{output_path}/visualization_{save_id}_{f}", plot,
                              plot_size)
 
     if analytics is None:
@@ -105,6 +101,5 @@ def visualization(minio: MinIO, minio_input: str, minio_output: str, analytics: 
         metrics_size = len(metrics)
         metrics = BytesIO(metrics)
         metrics.seek(0)
-        bucket, filename = minio_output.split("/", 1)
-        minio.put_object(bucket, f"{filename}/metrics.html", metrics,
+        minio.put_object(output_bucket, f"{output_path}/visualization_{save_id}_metrics.html", metrics,
                          metrics_size)
